@@ -68,12 +68,13 @@ The `realm` binary will be available in `target/release`.
 - proxy: enable proxy-protocol.
 - balance: enable load balance.
 - transport: enable ws/tls/wss.
+- batched-udp: enable more efficient udp on linux.
 - multi-thread: enable tokio's multi-threaded IO scheduler.
 - mi-malloc: custom memory allocator.
 - jemalloc: custom memory allocator.
 - page-alloc: custom memory allocator.
 
-Default: hook + proxy + balance + transport + brutal-shutdown + multi-thread.
+Default: proxy + balance + transport + batched-udp + brutal-shutdown + multi-thread.
 
 See also: [Cargo.toml](Cargo.toml).
 
@@ -101,59 +102,60 @@ Or have a look at [Cross](https://github.com/cross-rs/cross), it makes things ea
 ## Usage
 
 ```shell
-Realm 2.4.0 [hook][proxy][balance][brutal][transport][multi-thread]
 A high efficiency relay tool
 
-USAGE:
-    realm [FLAGS] [OPTIONS]
+Usage: realm [FLAGS] [OPTIONS]
+
+Commands:
+  convert  convert your legacy configuration into an advanced one
 
 FLAGS:
-    -h, --help       show help
-    -v, --version    show version
-    -d, --daemon     run as a unix daemon
-    -u, --udp        force enable udp forward
-    -t, --ntcp       force disable tcp forward
-    -f, --tfo        force enable tcp fast open -- deprecated
-    -z, --splice     force enable tcp zero copy -- deprecated
+  -h, --help     show help
+  -v, --version  show version
+  -d, --daemon   run as a unix daemon
+  -u, --udp      force enable udp forward
+  -t, --ntcp     force disable tcp forward
+  -6, --ipv6     force disable ipv6 mapped ipv4
+  -f, --tfo      force enable tcp fast open -- deprecated
+  -z, --splice   force enable tcp zero copy -- deprecated
 
 OPTIONS:
-    -c, --config <path>                 use config file
-    -l, --listen <address>              listen address
-    -r, --remote <address>              remote address
-    -x, --through <address>             send through ip or address
-    -i, --interface <device>            bind to interface
-    -a, --listen-transport <options>    listen transport
-    -b, --remote-transport <options>    remote transport
+  -c, --config <path>               use config file
+  -l, --listen <address>            listen address
+  -r, --remote <address>            remote address
+  -x, --through <address>           send through ip or address
+  -i, --interface <device>          bind to interface
+  -a, --listen-transport <options>  listen transport
+  -b, --remote-transport <options>  remote transport
 
 SYS OPTIONS:
-    -n, --nofile <limit>          set nofile limit
-    -p, --pipe-page <number>      set pipe capacity
-    -j, --pre-conn-hook <path>    set pre-connect hook
+  -n, --nofile <limit>        set nofile limit
+  -p, --pipe-page <number>    set pipe capacity
+  -j, --pre-conn-hook <path>  set pre-connect hook
 
 LOG OPTIONS:
-        --log-level <level>    override log level
-        --log-output <path>    override log output
+      --log-level <level>  override log level
+      --log-output <path>  override log output
 
 DNS OPTIONS:
-        --dns-mode <mode>            override dns mode
-        --dns-min-ttl <second>       override dns min ttl
-        --dns-max-ttl <second>       override dns max ttl
-        --dns-cache-size <number>    override dns cache size
-        --dns-protocol <protocol>    override dns protocol
-        --dns-servers <servers>      override dns servers
+      --dns-mode <mode>          override dns mode
+      --dns-min-ttl <second>     override dns min ttl
+      --dns-max-ttl <second>     override dns max ttl
+      --dns-cache-size <number>  override dns cache size
+      --dns-protocol <protocol>  override dns protocol
+      --dns-servers <servers>    override dns servers
 
 PROXY OPTIONS:
-        --send-proxy                       send proxy protocol header
-        --send-proxy-version <version>     send proxy protocol version
-        --accept-proxy                     accept proxy protocol header
-        --accept-proxy-timeout <second>    accept proxy protocol timeout
+      --send-proxy <send_proxy>        send proxy protocol header
+      --send-proxy-version <version>   send proxy protocol version
+      --accept-proxy <accept_proxy>    accept proxy protocol header
+      --accept-proxy-timeout <second>  accept proxy protocol timeout
 
 TIMEOUT OPTIONS:
-        --tcp-timeout <second>    override tcp timeout
-        --udp-timeout <second>    override udp timeout
-
-SUBCOMMANDS:
-    convert    convert your legacy configuration into an advanced one
+      --tcp-timeout <second>         override tcp timeout(5s)
+      --udp-timeout <second>         override udp timeout(30s)
+      --tcp-keepalive <second>       override default tcp keepalive interval(15s)
+      --tcp-keepalive-probe <count>  override default tcp keepalive count(3)
 ```
 
 Start from command line arguments:
@@ -260,8 +262,11 @@ remote = "www.google.com:443"
 ├── network
 │   ├── no_tcp
 │   ├── use_udp
+│   ├── ipv6_only
 │   ├── tcp_timeout
 │   ├── udp_timeout
+│   ├── tcp_keepalive
+│   ├── tcp_keepalive_probe
 │   ├── send_proxy
 │   ├── send_proxy_version
 │   ├── accept_proxy
@@ -470,6 +475,17 @@ Due to the receiver side not limiting access to the association, the relay works
 
 default: false
 
+#### network.ipv6_only: bool
+
+Disable ipv4-mapped-ipv6 when binding to an ipv6 address.
+
+E.g.:
+`[::0]:port` with (ipv6_only=false) binds to `*:port`
+
+`[::0]:port` with (ipv6_only=true) binds to `[::]:port`
+
+default: false
+
 #### ~~network.zero_copy: bool~~ deprecated
 
 ~~Require `zero-copy` feature.~~
@@ -501,6 +517,24 @@ Terminate udp association after `timeout`.
 The timeout value must be properly configured in case of memory leak. Do not use a large `timeout`!
 
 default: 30
+
+#### network.tcp_keepalive: unsigned int
+
+TCP Keepalive interval.
+
+On Linux, this is equivalent to setting both `net.ipv4.tcp_keepalive_time` and `net.ipv4.tcp_keepalive_intvl`.
+
+To use system's tcp keepalive interval, you need to explicitly set this option to 0.
+
+default: 15
+
+#### network.tcp_keepalive_probe: unsigned int
+
+TCP Keepalive retries.
+
+On Linux, this is equivalent to `ipv4.tcp_keepalive_probes`.
+
+default: 3
 
 #### network.send_proxy: bool
 

@@ -39,6 +39,8 @@ impl ProxyOpts {
 pub struct ConnectOpts {
     pub connect_timeout: usize,
     pub associate_timeout: usize,
+    pub tcp_keepalive: usize,
+    pub tcp_keepalive_probe: usize,
     pub bind_address: Option<SocketAddr>,
     pub bind_interface: Option<String>,
 
@@ -52,11 +54,17 @@ pub struct ConnectOpts {
     pub balancer: Balancer,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct BindOpts {
+    pub ipv6_only: bool,
+}
+
 /// Relay endpoint.
 #[derive(Debug, Clone)]
 pub struct Endpoint {
     pub laddr: SocketAddr,
     pub raddr: RemoteAddr,
+    pub bind_opts: BindOpts,
     pub conn_opts: ConnectOpts,
     pub extra_raddrs: Vec<RemoteAddr>,
 }
@@ -79,7 +87,14 @@ impl Display for Endpoint {
         for raddr in self.extra_raddrs.iter() {
             write!(f, "|{}", raddr)?;
         }
-        write!(f, "]; options: {}", &self.conn_opts)
+        write!(f, "]; options: {}; {}", &self.bind_opts, &self.conn_opts)
+    }
+}
+
+impl Display for BindOpts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let BindOpts { ipv6_only } = self;
+        write!(f, "ipv6_only={}", ipv6_only)
     }
 }
 
@@ -88,6 +103,8 @@ impl Display for ConnectOpts {
         let ConnectOpts {
             connect_timeout,
             associate_timeout,
+            tcp_keepalive,
+            tcp_keepalive_probe,
             bind_address,
             bind_interface,
 
@@ -126,8 +143,8 @@ impl Display for ConnectOpts {
 
         write!(
             f,
-            "connect-timeout={}s, associate-timeout={}s; ",
-            connect_timeout, associate_timeout
+            "tcp-keepalive={}s[{}] connect-timeout={}s, associate-timeout={}s; ",
+            tcp_keepalive, tcp_keepalive_probe, connect_timeout, associate_timeout
         )?;
 
         #[cfg(feature = "transport")]

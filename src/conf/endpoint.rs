@@ -157,6 +157,7 @@ impl Config for EndpointConf {
 
         // build partial conn_opts from netconf
         let NetInfo {
+            bind_opts,
             mut conn_opts,
             no_tcp,
             use_udp,
@@ -184,6 +185,7 @@ impl Config for EndpointConf {
             endpoint: Endpoint {
                 laddr,
                 raddr,
+                bind_opts,
                 conn_opts,
                 extra_raddrs,
             },
@@ -199,12 +201,12 @@ impl Config for EndpointConf {
     }
 
     fn from_cmd_args(matches: &clap::ArgMatches) -> Self {
-        let listen = matches.value_of("local").unwrap().to_string();
-        let remote = matches.value_of("remote").unwrap().to_string();
-        let through = matches.value_of("through").map(String::from);
-        let interface = matches.value_of("interface").map(String::from);
-        let listen_transport = matches.value_of("listen_transport").map(String::from);
-        let remote_transport = matches.value_of("remote_transport").map(String::from);
+        let listen = matches.get_one("local").cloned().unwrap();
+        let remote = matches.get_one("remote").cloned().unwrap();
+        let through = matches.get_one("through").cloned();
+        let interface = matches.get_one("interface").cloned();
+        let listen_transport = matches.get_one("listen_transport").cloned();
+        let remote_transport = matches.get_one("remote_transport").cloned();
 
         EndpointConf {
             listen,

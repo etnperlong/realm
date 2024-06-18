@@ -61,8 +61,8 @@ fn start_from_conf(full: FullConf) {
 
     let endpoints: Vec<EndpointInfo> = endpoints_conf
         .into_iter()
-        .map(|x| x.build())
-        .inspect(|x| println!("inited: {}", &x.endpoint))
+        .map(Config::build)
+        .inspect(|x| println!("inited: {}", x.endpoint))
         .collect();
 
     execute(endpoints);
@@ -92,7 +92,7 @@ fn setup_dns(dns: DnsConf) {
     println!("dns: {}", &dns);
 
     let (conf, opts) = dns.build();
-    realm::core::dns::build(conf, opts);
+    realm::core::dns::build_lazy(conf, opts);
 }
 
 fn execute(eps: Vec<EndpointInfo>) {

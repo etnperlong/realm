@@ -1,5 +1,4 @@
 use std::io::Result;
-
 use tokio::net::TcpStream;
 
 use super::socket;
@@ -16,7 +15,6 @@ use super::transport;
 
 use crate::trick::Ref;
 use crate::endpoint::{RemoteAddr, ConnectOpts};
-
 #[allow(unused)]
 pub async fn connect_and_relay(
     mut local: TcpStream,
@@ -25,7 +23,7 @@ pub async fn connect_and_relay(
     extra_raddrs: Ref<Vec<RemoteAddr>>,
 ) -> Result<()> {
     let ConnectOpts {
-        #[cfg(feature = "proxy-protocol")]
+        #[cfg(feature = "proxy")]
         proxy_opts,
 
         #[cfg(feature = "transport")]
@@ -33,6 +31,8 @@ pub async fn connect_and_relay(
 
         #[cfg(feature = "balance")]
         balancer,
+
+        tcp_keepalive,
         ..
     } = conn_opts.as_ref();
 

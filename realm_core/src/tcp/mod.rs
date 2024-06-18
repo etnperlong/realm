@@ -25,6 +25,7 @@ pub async fn run_tcp(endpoint: Endpoint) -> Result<()> {
     let Endpoint {
         laddr,
         raddr,
+        bind_opts,
         conn_opts,
         extra_raddrs,
     } = endpoint;
@@ -33,7 +34,8 @@ pub async fn run_tcp(endpoint: Endpoint) -> Result<()> {
     let conn_opts = Ref::new(&conn_opts);
     let extra_raddrs = Ref::new(&extra_raddrs);
 
-    let lis = socket::bind(&laddr).unwrap_or_else(|e| panic!("[tcp]failed to bind {}: {}", &laddr, e));
+    let lis = socket::bind(&laddr, bind_opts).unwrap_or_else(|e| panic!("[tcp]failed to bind {}: {}", &laddr, e));
+    let keepalive = socket::keepalive::build(&conn_opts);
 
     loop {
         let (local, addr) = match lis.accept().await {
@@ -50,6 +52,11 @@ pub async fn run_tcp(endpoint: Endpoint) -> Result<()> {
 
         // ignore error
         let _ = local.set_nodelay(true);
+        // set tcp_keepalive
+        if let Some(kpa) = &keepalive {
+            use socket::keepalive::SockRef;
+            SockRef::from(&local).set_tcp_keepalive(kpa)?;
+        }
 
         tokio::spawn(async move {
             match connect_and_relay(local, raddr, conn_opts, extra_raddrs).await {
